@@ -484,6 +484,7 @@ export function createReactAgent<
     postModelHook,
     name,
     includeAgentName,
+    abortSignal,
   } = params;
 
   let toolClasses: (ClientTool | ServerTool)[];
@@ -494,7 +495,9 @@ export function createReactAgent<
     toolNode = tools;
   } else {
     toolClasses = tools;
-    toolNode = new ToolNode(toolClasses.filter(isClientTool));
+    toolNode = new ToolNode(toolClasses.filter(isClientTool), {
+      signal: abortSignal,
+    });
   }
 
   let cachedStaticModel: Runnable | null = null;
@@ -590,7 +593,10 @@ export function createReactAgent<
       modelWithStructuredOutput = model.withStructuredOutput(responseFormat);
     }
 
-    const response = await modelWithStructuredOutput.invoke(messages, config);
+    const response = await modelWithStructuredOutput.invoke(messages, {
+      ...config,
+      signal: abortSignal,
+    });
     return { structuredResponse: response };
   };
 
@@ -606,10 +612,10 @@ export function createReactAgent<
         : await _getStaticModel(llm);
 
     // TODO: Auto-promote streaming.
-    const response = (await modelRunnable.invoke(
-      getModelInputState(state),
-      config
-    )) as BaseMessage;
+    const response = (await modelRunnable.invoke(getModelInputState(state), {
+      ...config,
+      signal: abortSignal,
+    })) as BaseMessage;
     // add agent name to the AIMessage
     // TODO: figure out if we can avoid mutating the message directly
     response.name = name;

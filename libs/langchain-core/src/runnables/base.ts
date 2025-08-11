@@ -1958,7 +1958,7 @@ export class RunnableSequence<
       }
       // TypeScript can't detect that the last output of the sequence returns RunOutput, so call it out of the loop here
       if (options?.signal?.aborted) {
-        throw new Error("Aborted");
+        throw new Error(options.signal.reason ?? "Aborted");
       }
       finalOutput = await this.last.invoke(
         nextStepInput,

@@ -680,6 +680,10 @@ export function tool<
     schema,
     func: async (input, runManager, config) => {
       return new Promise<ToolOutputT>((resolve, reject) => {
+        config?.signal?.addEventListener("abort", () => {
+          return reject(config?.signal?.reason ?? new Error("Aborted"));
+        });
+
         const childConfig = patchConfig(config, {
           callbacks: runManager?.getChild(),
         });
@@ -687,7 +691,13 @@ export function tool<
           pickRunnableConfigKeys(childConfig),
           async () => {
             try {
-              resolve(func(input, childConfig));
+              const result = await func(input, childConfig);
+
+              if (config?.signal?.aborted) {
+                return;
+              }
+
+              resolve(result);
             } catch (e) {
               reject(e);
             }

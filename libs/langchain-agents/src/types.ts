@@ -202,4 +202,9 @@ export type CreateReactAgentParams<
    * @default false
    */
   asStateGraph?: AsStateGraph;
+
+  /**
+   * An optional AbortSignal to abort the agent.
+   */
+  abortSignal?: AbortSignal;
 };

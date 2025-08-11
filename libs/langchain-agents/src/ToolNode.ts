@@ -19,10 +19,19 @@ import {
 import { RunnableCallable } from "./RunnableCallable.js";
 import { isSend } from "./utils.js";
 
+/**
+ * TypeScript currently doesn't support types for `AbortSignal.any`
+ * @see https://github.com/microsoft/TypeScript/issues/60695
+ */
+declare const AbortSignal: {
+  any?(signals: AbortSignal[]): AbortSignal;
+};
+
 export type ToolNodeOptions = {
   name?: string;
   tags?: string[];
   handleToolErrors?: boolean;
+  signal?: AbortSignal;
 };
 
 const isBaseMessageArray = (input: unknown): input is BaseMessage[] =>
@@ -164,6 +173,8 @@ export class ToolNode<T = any> extends RunnableCallable<T, T> {
 
   trace = false;
 
+  signal?: AbortSignal;
+
   constructor(
     tools: (StructuredToolInterface | DynamicTool | RunnableToolLike)[],
     options?: ToolNodeOptions
@@ -176,6 +187,7 @@ export class ToolNode<T = any> extends RunnableCallable<T, T> {
     });
     this.tools = tools;
     this.handleToolErrors = handleToolErrors ?? this.handleToolErrors;
+    this.signal = options?.signal;
   }
 
   protected async runTool(
@@ -187,7 +199,22 @@ export class ToolNode<T = any> extends RunnableCallable<T, T> {
       if (tool === undefined) {
         throw new Error(`Tool "${call.name}" not found.`);
       }
-      const output = await tool.invoke({ ...call, type: "tool_call" }, config);
+
+      /**
+       * `config` always contains a signal from LangGraphs Pregel class.
+       * To ensure we acknowledge the abort signal from the user, we merge it
+       * with the signal from the ToolNode.
+       */
+      const signal = this.signal
+        ? this.signal && AbortSignal.any
+          ? AbortSignal.any([this.signal, config.signal!])
+          : config.signal
+        : config.signal;
+
+      const output = await tool.invoke(
+        { ...call, type: "tool_call" },
+        { ...config, signal }
+      );
 
       if (
         (isBaseMessage(output) && output.getType() === "tool") ||
